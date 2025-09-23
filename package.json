@@ -1,0 +1,39 @@
+{
+  "name": "ai-chatbot",
+  "version": "1.0.0",
+  "description": "Full-stack AI chatbot with RAG capabilities",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && python main.py",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && pytest ../tests/ -v",
+    "test:frontend": "cd frontend && npm test",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && pip install -r requirements.txt",
+    "setup": "npm run install:all && echo 'Setup complete! Configure your .env file and run npm run dev'"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "chatbot",
+    "ai",
+    "rag",
+    "fastapi",
+    "react",
+    "openai",
+    "vector-database"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0",
+    "python": ">=3.8.0"
+  },
+  "dependencies": {
+    "@tailwindcss/cli": "^4.1.13",
+    "tailwindcss": "^4.1.13"
+  }
+}

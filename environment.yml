@@ -1,0 +1,21 @@
+name: chatbot
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - psycopg2-binary
+  - fastapi
+  - uvicorn
+  - pydantic
+  - requests
+  - httpx
+  - sqlalchemy
+  - nodejs
+  - pip:
+      - openai>=1.86.0,<2.1.0
+      - chromadb
+      - langchain
+      - python-dotenv
+      - tiktoken

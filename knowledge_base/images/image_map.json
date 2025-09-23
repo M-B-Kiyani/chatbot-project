@@ -1,0 +1,7 @@
+// metalogics_kb/image_map.json
+{
+  "logo": ["logo", "company logo", "brand", "what does your logo look like"],
+  "architecture": ["architecture", "system design", "tech stack", "how is it built", "diagram"],
+  "services": ["services", "what do you offer", "solutions", "consulting", "AI services"],
+  "solutions": ["solutions", "use cases", "AI products", "enterprise AI"]
+}

@@ -1,0 +1,12 @@
+
+    This is a test document for RAG system testing.
+    
+    It contains information about:
+    - Document processing
+    - Vector embeddings
+    - Similarity search
+    - Answer generation
+    
+    The system should be able to find this document when searching for
+    relevant information about RAG functionality.
+    

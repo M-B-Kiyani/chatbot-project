@@ -1,0 +1,35 @@
+# Chatbot Knowledge Base
+
+## Overview
+This is a sample knowledge base document for testing the RAG (Retrieval-Augmented Generation) system.
+
+## Features
+- Document processing and chunking
+- OpenAI embeddings generation
+- Vector database storage with ChromaDB
+- Semantic search capabilities
+- Answer generation using retrieved context
+
+## API Endpoints
+- GET /api/rag-search?q=query - Search for relevant documents
+- POST /api/rag-answer - Generate answers using RAG
+- GET /api/knowledge - Get knowledge base statistics
+- POST /api/knowledge/process - Process all documents
+
+## Technical Stack
+- Backend: FastAPI
+- Vector Database: ChromaDB
+- Embeddings: OpenAI text-embedding-3-small
+- LLM: OpenAI GPT-3.5-turbo
+- Text Processing: tiktoken
+
+## Usage
+1. Place documents in the knowledge_base/documents/ directory
+2. Run the indexing script to process and embed documents
+3. Use the API endpoints to search and generate answers
+
+## Configuration
+- Chunk size: 1000 tokens
+- Chunk overlap: 200 tokens
+- Max search results: 5 (configurable)
+- Embedding model: text-embedding-3-small

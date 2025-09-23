@@ -1,0 +1,48 @@
+/* Custom styles for chatbot widget */
+@import "tailwindcss";
+/* Ensure high contrast and accessibility */
+#chat-widget {
+  font-family: "Inter", sans-serif;
+}
+
+/* Smooth expand animation */
+#chat-window {
+  transform: scale(0.8) translateY(20px);
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+#chat-window.open {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+/* Chat bubbles */
+.bot-message {
+  align-self: flex-start;
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.user-message {
+  align-self: flex-end;
+  background: #3b82f6;
+  color: white;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  #chat-window {
+    width: calc(100vw - 2rem);
+    height: calc(100vh - 6rem);
+    bottom: 1rem;
+    right: 1rem;
+  }
+}
+
+/* Focus styles for accessibility */
+button:focus,
+input:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
