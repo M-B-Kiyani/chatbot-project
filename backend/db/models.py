@@ -2,9 +2,10 @@
 Database models for the chatbot application
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, JSON, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
 
 Base = declarative_base()
 
@@ -59,4 +60,30 @@ class Lead(Base):
     session_id = Column(String, index=True)
     email = Column(String, unique=True, index=True)
     name = Column(String)
+
+class Document(Base):
+    """Document model for storing document metadata."""
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    file_path = Column(String, unique=True, index=True)
+    file_name = Column(String)
+    file_type = Column(String)
+    file_size = Column(Integer)
+    processed_at = Column(DateTime(timezone=True), server_default=func.now())
+    content = Column(Text)
+
+class DocumentChunk(Base):
+    """Document chunk model with embeddings."""
+    __tablename__ = "document_chunks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, index=True)
+    chunk_index = Column(Integer)
+    content = Column(Text)
+    embedding = Column(Vector(1536))  # OpenAI text-embedding-3-small dimension
+    chunk_metadata = Column(JSON)
+
+# Create vector index
+Index('document_chunks_embedding_idx', DocumentChunk.embedding, postgresql_using='ivfflat')
 

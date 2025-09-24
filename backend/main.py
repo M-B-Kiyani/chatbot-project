@@ -11,9 +11,10 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Add the backend directory to Python path
+# Add the project root to Python path for imports
 backend_dir = Path(__file__).parent
-sys.path.insert(0, str(backend_dir))
+project_root = backend_dir.parent
+sys.path.insert(0, str(project_root))
 
 def main():
     """Main function to initialize the backend server."""
@@ -51,9 +52,9 @@ def main():
 
 from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import router
-from services.rag_service import RAGService
-from db.database import create_tables
+from .api.routes import router
+from .services.rag_service import RAGService
+from .db.database import create_tables
 
 app = FastAPI()
 
@@ -68,23 +69,23 @@ app.add_middleware(
 
 app.include_router(router, prefix="/api")
 
-# @app.on_event("startup")
-# async def startup_event():
-#     """Initialize the RAG system and create database tables on startup."""
-#     print("Starting system initialization...")
-#     try:
-#         # Create database tables
-#         create_tables()
-#         print("Database tables created successfully!")
+@app.on_event("startup")
+async def startup_event():
+    """Initialize the RAG system and create database tables on startup."""
+    print("Starting system initialization...")
+    try:
+        # Create database tables
+        create_tables()
+        print("Database tables created successfully!")
 
-#         # Initialize RAG system
-#         rag_service = RAGService()
-#         rag_service.process_knowledge_base()
-#         print("RAG system initialized successfully!")
+        # Initialize RAG system
+        rag_service = RAGService()
+        rag_service.process_knowledge_base()
+        print("RAG system initialized successfully!")
 
-#     except Exception as e:
-#         print(f"Error initializing system: {e}")
-#         print("The system will continue but some functionality may not work properly.")
+    except Exception as e:
+        print(f"Error initializing system: {e}")
+        print("The system will continue but some functionality may not work properly.")
 
 
 @app.get("/health")

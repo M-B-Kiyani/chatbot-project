@@ -8,20 +8,15 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pathlib import Path
 
-# Add the knowledge_base directory to the path
-sys.path.append(str(Path(__file__).parent.parent.parent / "knowledge_base"))
-
-from processors.document_processor import DocumentProcessor
+from knowledge_base.processors.document_processor import DocumentProcessor
 
 class ChatService:
     """Service for handling chat operations."""
 
     def __init__(self):
         self.openai_key = os.getenv('OPENAI_API_KEY')
-        self.vector_db_key = os.getenv('PINECONE_API_KEY')
         self.document_processor = DocumentProcessor(
-            documents_dir=str(Path(__file__).parent.parent.parent / "knowledge_base"),
-            embeddings_dir=str(Path(__file__).parent.parent.parent / "knowledge_base" / "embeddings")
+            documents_dir=str(Path(__file__).parent.parent.parent / "knowledge_base")
         )
 
     async def process_message(self, message: str, user_id: Optional[str] = None) -> Dict[str, Any]:
@@ -67,7 +62,12 @@ class ChatService:
         Returns:
             List of relevant documents
         """
-        return self.document_processor.search_similar_documents(query, n_results=5)
+        from backend.db.database import SessionLocal
+        db = SessionLocal()
+        try:
+            return self.document_processor.search_similar_documents(query, n_results=5, db=db)
+        finally:
+            db.close()
 
     def _generate_answer(self, query: str, docs: List[Dict[str, Any]]) -> str:
         """Generate an answer using retrieved documents and OpenAI."""

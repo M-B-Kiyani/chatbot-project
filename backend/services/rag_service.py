@@ -14,10 +14,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Add the knowledge_base directory to the path
-sys.path.append(str(Path(__file__).parent.parent.parent / "knowledge_base"))
-
-from processors.document_processor import DocumentProcessor
+from knowledge_base.processors.document_processor import DocumentProcessor
 
 class RAGService:
     """Service for Retrieval-Augmented Generation."""
@@ -25,22 +22,26 @@ class RAGService:
     def __init__(self):
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.document_processor = DocumentProcessor(
-            documents_dir=str(Path(__file__).parent.parent.parent / "knowledge_base"),
-            embeddings_dir=str(Path(__file__).parent.parent.parent / "knowledge_base" / "embeddings")
+            documents_dir=str(Path(__file__).parent.parent.parent / "knowledge_base")
         )
     
     def search_documents(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
         """
         Search for relevant documents in the knowledge base.
-        
+
         Args:
             query: Search query
             n_results: Number of results to return
-            
+
         Returns:
             List of relevant documents with metadata and scores
         """
-        return self.document_processor.search_similar_documents(query, n_results)
+        from backend.db.database import SessionLocal
+        db = SessionLocal()
+        try:
+            return self.document_processor.search_similar_documents(query, n_results, db)
+        finally:
+            db.close()
     
     def generate_answer(self, query: str, docs: List[Dict[str, Any]], session_context: Optional[str] = None, relevance_threshold: float = 0.7) -> Dict[str, Any]:
         """
@@ -173,22 +174,32 @@ Please provide a comprehensive answer based on the above context."""
     
     def process_knowledge_base(self):
         """Process all documents in the knowledge base."""
-        return self.document_processor.process_all_documents()
+        from backend.db.database import SessionLocal
+        db = SessionLocal()
+        try:
+            return self.document_processor.process_all_documents(db)
+        finally:
+            db.close()
     
     def get_knowledge_base_stats(self) -> Dict[str, Any]:
         """Get statistics about the knowledge base."""
+        from backend.db.database import SessionLocal
+        db = SessionLocal()
         try:
-            # Get collection info
-            collection = self.document_processor.collection
-            count = collection.count()
-            
+            # Get document and chunk counts
+            doc_count = db.query(Document).count()
+            chunk_count = db.query(DocumentChunk).count()
+
             return {
-                "total_chunks": count,
-                "collection_name": collection.name,
+                "total_documents": doc_count,
+                "total_chunks": chunk_count,
                 "last_updated": datetime.utcnow().isoformat()
             }
         except Exception as e:
             return {
                 "error": str(e),
+                "total_documents": 0,
                 "total_chunks": 0
             }
+        finally:
+            db.close()

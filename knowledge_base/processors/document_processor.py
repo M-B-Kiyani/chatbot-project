@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import openai
 from openai import OpenAI
-import chromadb
-from chromadb.config import Settings
-import uuid
 from datetime import datetime
+from sqlalchemy.orm import Session
+from backend.db.database import get_db
+from backend.db.models import Document, DocumentChunk
 
 # Document processing imports
 try:
@@ -30,30 +30,16 @@ except ImportError:
 
 class DocumentProcessor:
     """Processes documents for knowledge base ingestion."""
-    
-    def __init__(self, documents_dir: str = "documents", embeddings_dir: str = "embeddings"):
+
+    def __init__(self, documents_dir: str = "documents"):
         self.documents_dir = Path(documents_dir)
-        self.embeddings_dir = Path(embeddings_dir)
-        self.embeddings_dir.mkdir(exist_ok=True)
-        
+
         # Initialize OpenAI client
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        
-        # Initialize ChromaDB
-        self.chroma_client = chromadb.PersistentClient(
-            path=str(self.embeddings_dir / "chroma_db"),
-            settings=Settings(anonymized_telemetry=False)
-        )
-        
-        # Get or create collection
-        self.collection = self.chroma_client.get_or_create_collection(
-            name="knowledge_base",
-            metadata={"description": "Knowledge base documents for RAG"}
-        )
-        
+
         # Initialize tokenizer for chunking
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
-        
+
         # Chunking parameters
         self.chunk_size = 1000  # tokens
         self.chunk_overlap = 200  # tokens
@@ -200,34 +186,45 @@ class DocumentProcessor:
             print(f"Error generating embeddings: {str(e)}")
             return None
     
-    def upsert_to_vector_db(self, document_data: Dict[str, Any]):
+    def upsert_to_vector_db(self, document_data: Dict[str, Any], db: Session):
         """
-        Upsert document chunks to vector database.
-        
+        Upsert document chunks to PostgreSQL vector database.
+
         Args:
             document_data: Processed document data
+            db: Database session
         """
         if not document_data or not document_data.get("chunks"):
             return
-        
+
         try:
+            # Check if document already exists
+            existing_doc = db.query(Document).filter(Document.file_path == document_data["file_path"]).first()
+            if existing_doc:
+                print(f"Document {document_data['file_name']} already exists, skipping")
+                return
+
+            # Create document record
+            doc = Document(
+                file_path=document_data["file_path"],
+                file_name=document_data["file_name"],
+                file_type=document_data["file_type"],
+                file_size=document_data["metadata"]["file_size"],
+                processed_at=document_data["processed_at"],
+                content=document_data["content"]
+            )
+            db.add(doc)
+            db.flush()  # Get the document ID
+
             # Generate embeddings for each chunk
-            chunk_embeddings = []
-            chunk_metadatas = []
-            chunk_ids = []
-            chunk_texts = []
-            
             for i, chunk in enumerate(document_data["chunks"]):
                 # Generate embedding
                 embedding = self.generate_embeddings(chunk)
                 if embedding is None:
                     continue
-                
-                # Create unique ID for chunk
-                chunk_id = f"{document_data['file_name']}_{i}_{hashlib.md5(chunk.encode()).hexdigest()[:8]}"
-                
+
                 # Prepare metadata
-                metadata = {
+                chunk_metadata = {
                     "file_name": document_data["file_name"],
                     "file_path": document_data["file_path"],
                     "file_type": document_data["file_type"],
@@ -235,92 +232,110 @@ class DocumentProcessor:
                     "chunk_size": len(chunk),
                     "processed_at": document_data["processed_at"]
                 }
-                
-                chunk_embeddings.append(embedding)
-                chunk_metadatas.append(metadata)
-                chunk_ids.append(chunk_id)
-                chunk_texts.append(chunk)
-            
-            # Upsert to ChromaDB
-            if chunk_embeddings:
-                self.collection.upsert(
-                    ids=chunk_ids,
-                    embeddings=chunk_embeddings,
-                    metadatas=chunk_metadatas,
-                    documents=chunk_texts
+
+                # Create chunk record
+                chunk_record = DocumentChunk(
+                    document_id=doc.id,
+                    chunk_index=i,
+                    content=chunk,
+                    embedding=embedding,
+                    chunk_metadata=chunk_metadata
                 )
-                print(f"Upserted {len(chunk_embeddings)} chunks from {document_data['file_name']}")
-            
+                db.add(chunk_record)
+
+            db.commit()
+            print(f"Upserted {len(document_data['chunks'])} chunks from {document_data['file_name']}")
+
         except Exception as e:
+            db.rollback()
             print(f"Error upserting to vector DB: {str(e)}")
     
-    def search_similar_documents(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
+    def search_similar_documents(self, query: str, n_results: int = 5, db: Session = None) -> List[Dict[str, Any]]:
         """
-        Search for similar documents in the vector database.
-        
+        Search for similar documents in the PostgreSQL vector database.
+
         Args:
             query: Search query
             n_results: Number of results to return
-            
+            db: Database session
+
         Returns:
             List of similar documents with metadata and scores
         """
+        if db is None:
+            # Get a database session
+            from backend.db.database import SessionLocal
+            db = SessionLocal()
+
         try:
             # Generate embedding for query
             query_embedding = self.generate_embeddings(query)
             if query_embedding is None:
                 return []
-            
-            # Search in ChromaDB
-            results = self.collection.query(
-                query_embeddings=[query_embedding],
-                n_results=n_results,
-                include=["documents", "metadatas", "distances"]
-            )
-            
+
+            # Search using pgvector cosine similarity
+            from sqlalchemy import text
+            results = db.query(
+                DocumentChunk,
+                DocumentChunk.embedding.cosine_distance(query_embedding).label('distance')
+            ).join(Document).order_by(
+                DocumentChunk.embedding.cosine_distance(query_embedding)
+            ).limit(n_results).all()
+
             # Format results
             similar_docs = []
-            for i in range(len(results["ids"][0])):
+            for chunk, distance in results:
                 doc = {
-                    "id": results["ids"][0][i],
-                    "content": results["documents"][0][i],
-                    "metadata": results["metadatas"][0][i],
-                    "relevance_score": 1 - results["distances"][0][i]  # Convert distance to similarity
+                    "id": chunk.id,
+                    "content": chunk.content,
+                    "metadata": chunk.chunk_metadata,
+                    "relevance_score": 1 - distance  # Convert distance to similarity
                 }
                 similar_docs.append(doc)
-            
+
             return similar_docs
-            
+
         except Exception as e:
             print(f"Error searching documents: {str(e)}")
             return []
+        finally:
+            if db:
+                db.close()
     
-    def process_all_documents(self):
+    def process_all_documents(self, db: Session = None):
         """Process all documents in the documents directory and subdirectories."""
-        if not self.documents_dir.exists():
-            print(f"Documents directory {self.documents_dir} does not exist")
-            return
-        
-        processed_count = 0
-        # Recursively find all supported files
-        supported_extensions = ['.txt', '.md', '.py', '.js', '.html', '.css', '.json', '.yaml', '.yml']
-        
-        # Add PDF and DOCX if libraries are available
-        if PDF_AVAILABLE:
-            supported_extensions.append('.pdf')
-        if DOCX_AVAILABLE:
-            supported_extensions.append('.docx')
-        
-        for file_path in self.documents_dir.rglob('*'):
-            if file_path.is_file() and file_path.suffix.lower() in supported_extensions:
-                print(f"Processing: {file_path.relative_to(self.documents_dir)}")
-                document_data = self.process_document(file_path)
-                if document_data:
-                    self.upsert_to_vector_db(document_data)
-                    processed_count += 1
-                    print(f"Processed: {file_path.relative_to(self.documents_dir)}")
-        
-        print(f"Total documents processed: {processed_count}")
+        if db is None:
+            from backend.db.database import SessionLocal
+            db = SessionLocal()
+
+        try:
+            if not self.documents_dir.exists():
+                print(f"Documents directory {self.documents_dir} does not exist")
+                return
+
+            processed_count = 0
+            # Recursively find all supported files
+            supported_extensions = ['.txt', '.md', '.py', '.js', '.html', '.css', '.json', '.yaml', '.yml']
+
+            # Add PDF and DOCX if libraries are available
+            if PDF_AVAILABLE:
+                supported_extensions.append('.pdf')
+            if DOCX_AVAILABLE:
+                supported_extensions.append('.docx')
+
+            for file_path in self.documents_dir.rglob('*'):
+                if file_path.is_file() and file_path.suffix.lower() in supported_extensions:
+                    print(f"Processing: {file_path.relative_to(self.documents_dir)}")
+                    document_data = self.process_document(file_path)
+                    if document_data:
+                        self.upsert_to_vector_db(document_data, db)
+                        processed_count += 1
+                        print(f"Processed: {file_path.relative_to(self.documents_dir)}")
+
+            print(f"Total documents processed: {processed_count}")
+        finally:
+            if db:
+                db.close()
 
 if __name__ == "__main__":
     processor = DocumentProcessor()

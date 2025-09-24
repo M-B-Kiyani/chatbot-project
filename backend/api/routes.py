@@ -13,24 +13,18 @@ import json
 from pathlib import Path
 from sqlalchemy.orm import Session
 
-# Add the backend directory to Python path
-backend_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(backend_dir))
 
-# Add the services directory to the path
-sys.path.append(str(Path(__file__).parent.parent / "services"))
-
-from services.rag_service import RAGService
-from db.database import get_db
-from db.models import Session as SessionModel, Lead
+from ..services.rag_service import RAGService
+from ..db.database import get_db
+from ..db.models import Session as SessionModel, Lead
 import json
 from sqlalchemy.orm import Session as DBSession
 
 # Calendar imports
-from services.calendar_service import calendar_service
+from ..services.calendar_service import calendar_service
 
 # HubSpot imports
-from services.hubspot_service import upsert_contact_and_add_note
+from ..services.hubspot_service import upsert_contact_and_add_note
 
 router = APIRouter()
 
