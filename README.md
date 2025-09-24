@@ -171,7 +171,7 @@ PORT=8000
 | `OPENAI_API_KEY`            | OpenAI API key for AI responses            | ✅       |
 | `DATABASE_URL`              | Database connection URL                    | ✅       |
 | `APP_BASE_URL`              | Base URL for the application               | ✅       |
-| `PORT`                      | Application port (default: 8000)           | ❌       |
+| `PORT`                      | Application port (default: 8000)           | ✅       |
 
 ### 3. Run Development Servers
 
