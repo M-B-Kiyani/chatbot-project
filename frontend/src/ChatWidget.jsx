@@ -28,7 +28,7 @@ const ChatWidget = ({ onBookDemo }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(true);
   const [apiBaseUrl] = useState(
-    process.env.REACT_APP_API_BASE_URL || "http://localhost:8000"
+    process.env.REACT_APP_API_BASE_URL || "http://localhost:8000/api"
   );
   const [sessionId] = useState(
     `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`

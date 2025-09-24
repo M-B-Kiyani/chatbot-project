@@ -8,5 +8,10 @@
     "query": "What services do you offer?",
     "reason": "No documents found",
     "timestamp": "2025-09-22T14:07:56.818399"
+  },
+  {
+    "query": "Hello",
+    "reason": "No documents found",
+    "timestamp": "2025-09-24T07:36:33.991592"
   }
 ]

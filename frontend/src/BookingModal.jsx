@@ -80,7 +80,7 @@ const BookingModal = ({ isOpen, onClose }) => {
       };
 
       const calendarResponse = await fetch(
-        "http://localhost:8000/calendar/create",
+        "http://localhost:8000/api/calendar/create",
         {
           method: "POST",
           headers: {
@@ -92,7 +92,7 @@ const BookingModal = ({ isOpen, onClose }) => {
 
       if (calendarResponse.ok) {
         // Then, upsert to HubSpot
-        await fetch("http://localhost:8000/upsert-hubspot", {
+        await fetch("http://localhost:8000/api/upsert-hubspot", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

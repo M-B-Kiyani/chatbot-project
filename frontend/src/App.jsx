@@ -124,7 +124,7 @@ function App() {
     setContactLoading(true);
 
     const apiBaseUrl =
-      process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+      process.env.REACT_APP_API_BASE_URL || "http://localhost:8000/api";
 
     try {
       await fetch(`${apiBaseUrl}/upsert-hubspot`, {

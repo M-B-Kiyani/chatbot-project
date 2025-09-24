@@ -22,7 +22,7 @@ const PricingModal = ({ isOpen, onClose }) => {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:8000/pricing?service=${selectedService}`
+        `http://localhost:8000/api/pricing?service=${selectedService}`
       );
       if (response.ok) {
         const data = await response.json();

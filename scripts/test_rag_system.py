@@ -15,8 +15,7 @@ load_dotenv()
 
 # Add the project root to the path
 project_root = Path(__file__).parent.parent
-sys.path.append(str(project_root / "knowledge_base"))
-sys.path.append(str(project_root / "backend" / "services"))
+sys.path.append(str(project_root))
 
 def test_document_processing():
     """Test document processing functionality."""
@@ -35,15 +34,15 @@ def test_document_processing():
         if sample_doc.exists():
             doc_data = processor.process_document(sample_doc)
             if doc_data:
-                print(f"✓ Document processed successfully: {doc_data['file_name']}")
+                print(f"[OK] Document processed successfully: {doc_data['file_name']}")
                 print(f"  - Chunks: {len(doc_data['chunks'])}")
                 print(f"  - File type: {doc_data['file_type']}")
                 return True
             else:
-                print("✗ Document processing failed")
+                print("[ERROR] Document processing failed")
                 return False
         else:
-            print("✗ Sample document not found")
+            print("[ERROR] Sample document not found")
             return False
             
     except Exception as e:
