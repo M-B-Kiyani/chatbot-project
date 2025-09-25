@@ -45,7 +45,32 @@ This will:
 - Process all documents in the knowledge_base/metalogics_kb/ directory
 - Chunk the text into optimal sizes for embedding
 - Generate embeddings using OpenAI
-- Store everything in the ChromaDB vector database
+- Store everything in the PostgreSQL vector database (pgvector)
+
+### 5. Rebuild Embeddings (Advanced)
+
+If you need to rebuild embeddings from scratch (e.g., after updating documents or changing embedding parameters):
+
+```bash
+# Dry run to see what would be done
+python knowledge_base/scripts/rebuild_embeddings.py --dry-run
+
+# Actually rebuild embeddings (this will clear existing data)
+python knowledge_base/scripts/rebuild_embeddings.py
+
+# Append new documents without clearing existing data
+python knowledge_base/scripts/rebuild_embeddings.py --skip-clear
+```
+
+**Requirements:**
+- Set `OPENAI_API_KEY` environment variable
+- PostgreSQL database with pgvector extension enabled
+
+**What it does:**
+- Clears existing documents and chunks from the database
+- Re-processes all documents in the knowledge_base/ directory
+- Generates new embeddings using OpenAI text-embedding-3-small
+- Stores everything in the PostgreSQL vector database
 
 ## API Endpoints
 
