@@ -174,6 +174,18 @@ PORT=8000
 | `PORT`                      | Application port (default: 8000)           | ✅       |
 | `SECRET_KEY`                | Application secret key                     | ✅       |
 
+### Google OAuth Setup
+
+- [ ] Go to [Google Cloud Console](https://console.cloud.google.com/)
+- [ ] Create/select a project
+- [ ] Enable Google Calendar API
+- [ ] Create OAuth 2.0 credentials
+- [ ] Add authorized redirect URI: `http://localhost:8000/api/calendar/callback`
+- [ ] Set environment variables:
+  - `GOOGLE_CLIENT_ID`: Your Google OAuth client ID
+  - `GOOGLE_CLIENT_SECRET`: Your Google OAuth client secret
+  - `GOOGLE_REDIRECT_URI`: `http://localhost:8000/api/calendar/callback`
+
 ### 3. Run Development Servers
 
 #### Start Backend Server
@@ -388,7 +400,7 @@ OPENAI_API_KEY=your_openai_api_key
 # Google OAuth
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_REDIRECT_URI=https://yourdomain.com/google/callback
+GOOGLE_REDIRECT_URI=https://yourdomain.com/api/calendar/callback
 
 # HubSpot
 HUBSPOT_DEVELOPER_API_KEY=your_hubspot_developer_api_key
@@ -424,8 +436,8 @@ SESSIONS_API_URL=https://yourdomain.com/api  # Optional: for session data fetchi
 3. Enable Google+ API
 4. Create OAuth 2.0 credentials
 5. Add authorized redirect URIs:
-   - `https://yourdomain.com/google/callback` (production)
-   - `http://localhost:3000/google/callback` (development)
+   - `https://yourdomain.com/api/calendar/callback` (production)
+   - `http://localhost:8000/api/calendar/callback` (development)
 
 #### HubSpot OAuth
 
