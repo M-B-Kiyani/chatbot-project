@@ -139,3 +139,10 @@ config/secrets.json
 # Specific directories for vector databases
 chroma_test_store/
 knowledge_base/embeddings/chroma_db/
+
+# tokens and credentials
+*.pickle
+*.json
+*.key
+.env
+.env.local
