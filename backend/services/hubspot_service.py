@@ -7,17 +7,15 @@ from datetime import datetime
 from typing import Optional, Tuple, Dict, Any
 
 BASE_URL = "https://api.hubapi.com"
-HUBSPOT_TOKEN = os.environ.get("HUBSPOT_ACCESS_TOKEN")
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
 SESSIONS_API_URL = os.environ.get("SESSIONS_API_URL")  # optional: e.g. http://localhost:8001
 
-if not HUBSPOT_TOKEN:
-    print("Warning: HUBSPOT_ACCESS_TOKEN is not set. HubSpot integration will not work.")
-
-HEADERS = {
-    "Authorization": f"Bearer {HUBSPOT_TOKEN}",
-    "Content-Type": "application/json",
-}
+def get_headers(access_token: str) -> Dict[str, str]:
+    """Get headers with access token."""
+    return {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
 
 EMAIL_RE = re.compile(r"[^@]+@[^@]+\.[^@]+")
 
@@ -33,7 +31,7 @@ def _ensure_int_if_digits(s: Any):
     s = str(s)
     return int(s) if s.isdigit() else s
 
-def search_contact_by_email(email: str) -> Tuple[Optional[str], Optional[dict]]:
+def search_contact_by_email(email: str, access_token: str) -> Tuple[Optional[str], Optional[dict]]:
     """
     Returns (contact_id, properties) or (None, None) if not found.
     """
@@ -44,7 +42,8 @@ def search_contact_by_email(email: str) -> Tuple[Optional[str], Optional[dict]]:
         ],
         "limit": 1,
     }
-    resp = requests.post(url, headers=HEADERS, json=payload, timeout=10)
+    headers = get_headers(access_token)
+    resp = requests.post(url, headers=headers, json=payload, timeout=10)
     resp.raise_for_status()
     data = resp.json()
     results = data.get("results", [])
@@ -52,7 +51,7 @@ def search_contact_by_email(email: str) -> Tuple[Optional[str], Optional[dict]]:
         return results[0]["id"], results[0].get("properties", {})
     return None, None
 
-def create_contact(name: str, email: str, company: Optional[str] = None) -> str:
+def create_contact(name: str, email: str, company: Optional[str] = None, access_token: str = None) -> str:
     url = f"{BASE_URL}/crm/v3/objects/contacts"
     first, last = _split_name(name)
     properties = {"email": email}
@@ -63,11 +62,12 @@ def create_contact(name: str, email: str, company: Optional[str] = None) -> str:
     if company:
         properties["company"] = company
     payload = {"properties": properties}
-    resp = requests.post(url, headers=HEADERS, json=payload, timeout=10)
+    headers = get_headers(access_token)
+    resp = requests.post(url, headers=headers, json=payload, timeout=10)
     resp.raise_for_status()
     return resp.json()["id"]
 
-def update_contact(contact_id: str, name: Optional[str] = None, company: Optional[str] = None) -> str:
+def update_contact(contact_id: str, name: Optional[str] = None, company: Optional[str] = None, access_token: str = None) -> str:
     url = f"{BASE_URL}/crm/v3/objects/contacts/{contact_id}"
     properties = {}
     if name:
@@ -81,11 +81,12 @@ def update_contact(contact_id: str, name: Optional[str] = None, company: Optiona
     if not properties:
         return contact_id
     payload = {"properties": properties}
-    resp = requests.patch(url, headers=HEADERS, json=payload, timeout=10)
+    headers = get_headers(access_token)
+    resp = requests.patch(url, headers=headers, json=payload, timeout=10)
     resp.raise_for_status()
     return resp.json()["id"]
 
-def create_note_for_contact(contact_id: str, note_body: str, timestamp_iso: Optional[str] = None) -> str:
+def create_note_for_contact(contact_id: str, note_body: str, timestamp_iso: Optional[str] = None, access_token: str = None) -> str:
     """
     Creates a note and associates it to the contact. Uses the 'note_to_contact' association type (HubSpot accepts snake_case).
     """
@@ -105,7 +106,8 @@ def create_note_for_contact(contact_id: str, note_body: str, timestamp_iso: Opti
         "properties": {"hs_timestamp": timestamp_iso, "hs_note_body": note_body},
         "associations": associations,
     }
-    resp = requests.post(url, headers=HEADERS, json=payload, timeout=10)
+    headers = get_headers(access_token)
+    resp = requests.post(url, headers=headers, json=payload, timeout=10)
     resp.raise_for_status()
     return resp.json()["id"]
 
@@ -150,6 +152,7 @@ def upsert_contact_and_add_note(
     interest: Optional[str],
     session_id: Optional[str],
     conversation: Optional[str] = None,
+    access_token: str = None,
 ) -> Dict[str, str]:
     """
     Upsert a HubSpot contact and attach a note containing:
@@ -161,15 +164,15 @@ def upsert_contact_and_add_note(
         raise ValueError("Invalid email")
 
     # 1) search
-    contact_id, _ = search_contact_by_email(email)
+    contact_id, _ = search_contact_by_email(email, access_token)
 
     # 2) create or update
     if contact_id:
         action = "updated"
-        update_contact(contact_id, name=name, company=company)
+        update_contact(contact_id, name=name, company=company, access_token=access_token)
     else:
         action = "created"
-        contact_id = create_contact(name=name, email=email, company=company)
+        contact_id = create_contact(name=name, email=email, company=company, access_token=access_token)
 
     # 3) get conversation snippet
     text = conversation or _fetch_session_text_from_service(session_id) or ""
@@ -189,6 +192,6 @@ def upsert_contact_and_add_note(
 
     note_body = "\n".join(note_lines).strip() or f"Lead from chatbot. Session: {session_id or 'N/A'}"
 
-    note_id = create_note_for_contact(contact_id, note_body)
+    note_id = create_note_for_contact(contact_id, note_body, access_token=access_token)
 
     return {"contact_id": str(contact_id), "note_id": str(note_id), "action": action}

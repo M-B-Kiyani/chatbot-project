@@ -54,6 +54,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router
+
+print("Main module loaded")
+from backend.api.calender import router as calendar_router
+from backend.api.chat import router as chat_router
+from backend.api.hubspot import router as hubspot_router
+from backend.api.intent import router as intent_router
 from services.rag_service import RAGService
 from db.database import create_tables
 
@@ -81,13 +87,17 @@ app = FastAPI(lifespan=lifespan)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Frontend URLs
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:4173", "http://127.0.0.1:4173"],  # Frontend URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(router, prefix="/api")
+app.include_router(calendar_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
+app.include_router(hubspot_router, prefix="/api")
+app.include_router(intent_router, prefix="/api")
 
 @app.get("/health")
 async def health_check():

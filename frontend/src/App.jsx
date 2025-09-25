@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import ChatWidget from "./ChatWidget";
+import ChatWidget from "../components/ChatbotWidget/ChatWidget";
 import PricingModal from "./PricingModal";
 import BookingModal from "./BookingModal";
 import {
@@ -681,7 +681,7 @@ function App() {
       </footer>
 
       {/* Chat Widget */}
-      <ChatWidget onBookDemo={() => setIsBookingModalOpen(true)} />
+      <ChatWidget baseApiUrl="http://localhost:8000" onBookDemo={() => setIsBookingModalOpen(true)} />
 
       {/* Pricing Modal */}
       <PricingModal

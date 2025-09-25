@@ -176,19 +176,18 @@ class CalendarService:
             window_hours = 3
             category = 60
         else:
-            return {"allowed": True, "reason": "Duration not in rule categories", "blockingEvents": []}
+            return {"allowed": True, "reason": "Duration exceeds maximum allowed (60 minutes)", "blockingEvents": []}
 
         # Parse requested start time
         start_dt = datetime.fromisoformat(requestedStartISO.replace('Z', '+00:00'))
 
-        # Define window: from start - window_hours to start + window_hours
+        # Define rolling window: from start - window_hours to start
         window_start = start_dt - timedelta(hours=window_hours)
-        window_end = start_dt + timedelta(hours=window_hours)
+        window_end = start_dt
 
-        # Query events in a range that includes possible overlapping events
-        # Add buffer for max duration (60m)
-        query_start = (window_start - timedelta(hours=1)).isoformat()
-        query_end = (window_end + timedelta(hours=1)).isoformat()
+        # Query events in the rolling window
+        query_start = window_start.isoformat()
+        query_end = window_end.isoformat()
         events = self.get_events(calendarId, query_start, query_end)
 
         # Helper to get category
@@ -215,13 +214,16 @@ class CalendarService:
             dur = (event_end - event_start).total_seconds() / 60
 
             if get_category(dur) == category:
-                # Check if event overlaps with the window
-                if max(event_start, window_start) < min(event_end, window_end):
+                # Event starts within the rolling window
+                if window_start <= event_start < window_end:
                     count += 1
                     blocking_events.append(event)
 
         allowed = count < 2
-        reason = "Within limit" if allowed else f"Exceeds max 2 bookings in {window_hours}h window"
+        if allowed:
+            reason = f"Booking allowed. Current count: {count} in last {window_hours} hour(s)."
+        else:
+            reason = f"Booking rejected: Maximum of 2 {category}-minute bookings allowed in the last {window_hours} hour(s). Current count: {count}."
         return {"allowed": allowed, "reason": reason, "blockingEvents": blocking_events}
 
     def suggest_next_slot(self, calendarId: str, requestedStartISO: str, durationMinutes: int, searchHorizonHours: int = 72) -> Dict[str, Any]:

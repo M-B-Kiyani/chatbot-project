@@ -172,6 +172,7 @@ PORT=8000
 | `DATABASE_URL`              | Database connection URL                    | ✅       |
 | `APP_BASE_URL`              | Base URL for the application               | ✅       |
 | `PORT`                      | Application port (default: 8000)           | ✅       |
+| `SECRET_KEY`                | Application secret key                     | ✅       |
 
 ### 3. Run Development Servers
 

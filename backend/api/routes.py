@@ -2,8 +2,10 @@
 API Routes for Chatbot Backend
 """
 
+print("Routes module loaded")
+
 from fastapi import APIRouter, HTTPException, Query, Depends
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 import sys
@@ -14,17 +16,13 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 
-from services.rag_service import RAGService
-from db.database import get_db
-from db.models import Session as SessionModel, Lead
+from backend.services.rag_service import RAGService
+from backend.db.database import get_db
+from backend.db.models import Session as SessionModel, Lead
 import json
 from sqlalchemy.orm import Session as DBSession
+import httpx
 
-# Calendar imports
-from services.calendar_service import calendar_service
-
-# HubSpot imports
-from services.hubspot_service import upsert_contact_and_add_note
 
 router = APIRouter()
 
@@ -62,16 +60,6 @@ pricing_templates = {
     }
 }
 
-class ChatMessage(BaseModel):
-    message: str
-    user_id: Optional[str] = None
-    session_id: Optional[str] = None
-
-class ChatResponse(BaseModel):
-    response: str
-    session_id: str
-    timestamp: str
-
 class RAGSearchResponse(BaseModel):
     query: str
     documents: List[dict]
@@ -84,25 +72,6 @@ class RAGAnswerResponse(BaseModel):
     documents_used: List[dict]
     timestamp: str
 
-class HubSpotUpsertRequest(BaseModel):
-    name: str
-    email: str
-    company: Optional[str] = None
-    interest: Optional[str] = None
-    session_id: str
-
-class SimpleHubSpotUpsertRequest(BaseModel):
-    name: str
-    email: EmailStr
-    company: Optional[str] = None
-
-class HubSpotUpsertResponse(BaseModel):
-    hubspot_contact_id: str
-    status: str
-
-class IntentHintRequest(BaseModel):
-    intent: str
-    session_id: str
 
 class LogMessageRequest(BaseModel):
     session_id: str
@@ -115,30 +84,6 @@ class LogMessageResponse(BaseModel):
     status: str
     session_id: str
 
-
-@router.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(message: ChatMessage):
-    """
-    Main chat endpoint for processing user messages using RAG.
-    """
-    try:
-        # Search for relevant documents
-        documents = rag_service.search_documents(message.message, 5)
-
-        # Generate answer using RAG service
-        result = rag_service.generate_answer(message.message, documents)
-
-        return ChatResponse(
-            response=result["answer"],
-            session_id=message.session_id or "default",
-            timestamp=datetime.utcnow().isoformat()
-        )
-    except Exception as e:
-        return ChatResponse(
-            response=f"Sorry, I encountered an error: {str(e)}",
-            session_id=message.session_id or "default",
-            timestamp=datetime.utcnow().isoformat()
-        )
 
 @router.get("/rag-search", response_model=RAGSearchResponse)
 async def rag_search(
@@ -246,60 +191,6 @@ async def process_knowledge_base():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Knowledge base processing failed: {str(e)}")
 
-# Calendar endpoints
-@router.get("/calendar/auth")
-async def calendar_auth():
-    """Initiate Google Calendar OAuth flow."""
-    try:
-        auth_url = calendar_service.initiate_oauth_flow()
-        return {"auth_url": auth_url}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OAuth initiation failed: {str(e)}")
-
-@router.get("/calendar/callback")
-async def calendar_callback(code: str = Query(..., description="Authorization code"),
-                           state: str = Query(..., description="State parameter")):
-    """Handle OAuth callback."""
-    try:
-        success = calendar_service.complete_oauth_flow(code, state)
-        if success:
-            return {"message": "Authentication successful"}
-        else:
-            raise HTTPException(status_code=400, detail="Authentication failed")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OAuth callback failed: {str(e)}")
-
-@router.get("/calendar/freebusy")
-async def calendar_freebusy(start: str = Query(..., description="Start time in ISO format"),
-                           end: str = Query(..., description="End time in ISO format"),
-                           calendar_id: str = Query("primary", description="Calendar ID"),
-                           timezone: str = Query("UTC", description="Timezone")):
-    """Get free/busy information."""
-    try:
-        result = calendar_service.get_freebusy(start, end, calendar_id, timezone)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Freebusy query failed: {str(e)}")
-
-@router.post("/calendar/create")
-async def calendar_create_event(event_data: dict):
-    """Create a calendar event."""
-    try:
-        summary = event_data.get("summary")
-        start = event_data.get("start")
-        end = event_data.get("end")
-        timezone = event_data.get("timezone", "UTC")
-        description = event_data.get("description")
-        attendees = event_data.get("attendees", [])
-        calendar_id = event_data.get("calendar_id", "primary")
-
-        if not summary or not start or not end:
-            raise HTTPException(status_code=400, detail="Missing required fields: summary, start, end")
-
-        event_id = calendar_service.create_event(summary, start, end, timezone, description, attendees, calendar_id)
-        return {"event_id": event_id}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Event creation failed: {str(e)}")
 
 @router.get("/pricing")
 async def get_pricing(service: str = Query(..., description="Service type")):
@@ -316,33 +207,6 @@ async def get_pricing(service: str = Query(..., description="Service type")):
         raise HTTPException(status_code=404, detail="Service not found")
     return pricing_templates[service]
 
-@router.post("/intent-hint")
-async def intent_hint(request: IntentHintRequest):
-    """
-    Get upsell suggestions based on detected intent.
-
-    Args:
-        request: IntentHintRequest with intent and session_id
-
-    Returns:
-        Upsell suggestions with services, reasons, and pricing links
-    """
-    if request.intent == "web-development":
-        upsells = [
-            {
-                "service": "SEO",
-                "reason": "improves visibility",
-                "pricing_link": "/api/pricing?service=seo"
-            },
-            {
-                "service": "Graphic Design",
-                "reason": "improves UX",
-                "pricing_link": "/api/pricing?service=graphic-design"
-            }
-        ]
-        return {"upsells": upsells}
-    else:
-        return {"upsells": []}
 
 @router.post("/api/log-message", response_model=LogMessageResponse)
 async def log_message(request: LogMessageRequest, db: DBSession = Depends(get_db)):
@@ -383,194 +247,5 @@ async def log_message(request: LogMessageRequest, db: DBSession = Depends(get_db
     db.commit()
 
     return LogMessageResponse(status="logged", session_id=request.session_id)
-
-@router.post("/upsert-hubspot")
-async def upsert_hubspot(request: SimpleHubSpotUpsertRequest):
-    """
-    Upsert a HubSpot contact.
-
-    Args:
-        request: SimpleHubSpotUpsertRequest with name, email, company
-
-    Returns:
-        HubSpot contact ID
-    """
-    try:
-        # Import the service functions
-        from services.hubspot_service import search_contact_by_email, create_contact, update_contact
-
-        # Search for existing contact
-        contact_id, _ = search_contact_by_email(request.email)
-
-        if contact_id:
-            # Update existing contact
-            contact_id = update_contact(contact_id, name=request.name, company=request.company)
-        else:
-            # Create new contact
-            contact_id = create_contact(request.name, request.email, request.company)
-
-        return {"hubspot_contact_id": contact_id}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"HubSpot upsert failed: {str(e)}")
-
-class ScheduleCheckRequest(BaseModel):
-    user: str
-    start: str  # ISO format datetime
-    duration: int  # minutes
-    calendar_id: Optional[str] = "primary"
-
-class ScheduleCheckResponse(BaseModel):
-    allowed: bool
-    reason: str
-    blocking_events: List[dict]
-    suggested_slot: Optional[str] = None
-
-@router.post("/schedule-check", response_model=ScheduleCheckResponse)
-async def schedule_check(request: ScheduleCheckRequest):
-    """
-    Check if a booking can be made at the specified time and duration.
-
-    Args:
-        request: ScheduleCheckRequest with user, start (ISO), duration (minutes)
-
-    Returns:
-        Whether booking is allowed, reason, blocking events, and suggested alternative slot
-    """
-    try:
-        # Check booking rules
-        check_result = calendar_service.check_booking_rules(
-            request.calendar_id,
-            request.start,
-            request.duration
-        )
-
-        # If not allowed, suggest next slot
-        suggested_slot = None
-        if not check_result["allowed"]:
-            suggestion = calendar_service.suggest_next_slot(
-                request.calendar_id,
-                request.start,
-                request.duration
-            )
-            if "slot" in suggestion:
-                suggested_slot = suggestion["slot"]
-
-        return ScheduleCheckResponse(
-            allowed=check_result["allowed"],
-            reason=check_result["reason"],
-            blocking_events=check_result["blockingEvents"],
-            suggested_slot=suggested_slot
-        )
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Schedule check failed: {str(e)}")
-
-class CreateBookingRequest(BaseModel):
-    user: str
-    start: str  # ISO format datetime
-    duration: int  # minutes
-    summary: str
-    description: Optional[str] = None
-    attendees: Optional[List[str]] = None
-    calendar_id: Optional[str] = "primary"
-    timezone: Optional[str] = "UTC"
-    hubspot_data: Optional[dict] = None  # Optional HubSpot upsert data
-
-class CreateBookingResponse(BaseModel):
-    event_id: str
-    allowed: bool
-    reason: str
-    hubspot_contact_id: Optional[str] = None
-    hubspot_status: Optional[str] = None
-
-@router.post("/create-booking", response_model=CreateBookingResponse)
-async def create_booking(request: CreateBookingRequest, db: Session = Depends(get_db)):
-    """
-    Create a calendar booking after checking rules, with optional HubSpot integration.
-
-    Args:
-        request: CreateBookingRequest with booking details and optional HubSpot data
-
-    Returns:
-        Event ID, whether allowed, reason, and HubSpot details if provided
-    """
-    try:
-        # First check if booking is allowed
-        check_result = calendar_service.check_booking_rules(
-            request.calendar_id,
-            request.start,
-            request.duration
-        )
-
-        if not check_result["allowed"]:
-            return CreateBookingResponse(
-                event_id="",
-                allowed=False,
-                reason=check_result["reason"]
-            )
-
-        # Calculate end time
-        from datetime import datetime, timedelta
-        start_dt = datetime.fromisoformat(request.start.replace('Z', '+00:00'))
-        end_dt = start_dt + timedelta(minutes=request.duration)
-        end_iso = end_dt.isoformat().replace('+00:00', 'Z')
-
-        # Create the event
-        event_id = calendar_service.create_event(
-            summary=request.summary,
-            start=request.start,
-            end=end_iso,
-            timezone=request.timezone,
-            description=request.description,
-            attendees=request.attendees,
-            calendar_id=request.calendar_id
-        )
-
-        # Optional HubSpot integration
-        hubspot_contact_id = None
-        hubspot_status = None
-        if request.hubspot_data:
-            try:
-                hubspot_result = upsert_contact_and_add_note(
-                    name=request.hubspot_data.get("name"),
-                    email=request.hubspot_data.get("email"),
-                    company=request.hubspot_data.get("company"),
-                    interest=request.hubspot_data.get("interest", "Booking Created"),
-                    session_id=request.hubspot_data.get("session_id", f"booking_{event_id}")
-                )
-                hubspot_contact_id = hubspot_result["contact_id"]
-                hubspot_status = hubspot_result["action"]
-
-                # Link to lead in database
-                lead = db.query(Lead).filter(Lead.email == request.hubspot_data.get("email")).first()
-                if lead:
-                    lead.hubspot_id = hubspot_contact_id
-                    lead.session_id = request.hubspot_data.get("session_id", f"booking_{event_id}")
-                else:
-                    lead = Lead(
-                        hubspot_id=hubspot_contact_id,
-                        session_id=request.hubspot_data.get("session_id", f"booking_{event_id}"),
-                        email=request.hubspot_data.get("email"),
-                        name=request.hubspot_data.get("name")
-                    )
-                    db.add(lead)
-                db.commit()
-
-            except Exception as e:
-                print(f"HubSpot integration failed: {e}")
-                # Don't fail the booking if HubSpot fails
-
-        return CreateBookingResponse(
-            event_id=event_id,
-            allowed=True,
-            reason="Booking created successfully",
-            hubspot_contact_id=hubspot_contact_id,
-            hubspot_status=hubspot_status
-        )
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Booking creation failed: {str(e)}")
-
 
 

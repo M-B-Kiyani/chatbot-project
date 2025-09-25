@@ -46,7 +46,7 @@ def setup_mock_events(scenario):
             "name": "Scenario 3: Two conflicting 15m events - should deny booking",
             "events": [
                 create_mock_event("2023-10-01T09:30:00Z", 15),
-                create_mock_event("2023-10-01T10:30:00Z", 15)
+                create_mock_event("2023-10-01T09:45:00Z", 15)
             ],
             "expected": False,
             "reason": "Exceeds max 2 bookings"
