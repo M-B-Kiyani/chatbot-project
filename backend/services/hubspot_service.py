@@ -12,7 +12,7 @@ APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
 SESSIONS_API_URL = os.environ.get("SESSIONS_API_URL")  # optional: e.g. http://localhost:8001
 
 if not HUBSPOT_TOKEN:
-    raise RuntimeError("HUBSPOT_ACCESS_TOKEN is required in env (create a HubSpot private app and paste the token).")
+    print("Warning: HUBSPOT_ACCESS_TOKEN is not set. HubSpot integration will not work.")
 
 HEADERS = {
     "Authorization": f"Bearer {HUBSPOT_TOKEN}",

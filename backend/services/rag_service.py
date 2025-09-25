@@ -20,7 +20,12 @@ class RAGService:
     """Service for Retrieval-Augmented Generation."""
     
     def __init__(self):
-        self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            self.openai_client = OpenAI(api_key=api_key)
+        else:
+            self.openai_client = None
+            print("Warning: OPENAI_API_KEY is not set. RAG answer generation will not work.")
         self.document_processor = DocumentProcessor(
             documents_dir=str(Path(__file__).parent.parent.parent / "knowledge_base")
         )

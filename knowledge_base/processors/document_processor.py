@@ -14,6 +14,10 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from backend.db.database import get_db
 from backend.db.models import Document, DocumentChunk
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Document processing imports
 try:
@@ -34,8 +38,16 @@ class DocumentProcessor:
     def __init__(self, documents_dir: str = "documents"):
         self.documents_dir = Path(documents_dir)
 
+        # Load environment variables
+        load_dotenv(dotenv_path=Path(__file__).parent.parent.parent / ".env")
+
         # Initialize OpenAI client
-        self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            self.openai_client = OpenAI(api_key=api_key)
+        else:
+            self.openai_client = None
+            print("Warning: OPENAI_API_KEY is not set. Document embedding will not work.")
 
         # Initialize tokenizer for chunking
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
