@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: chatbot_postgres
+    environment:
+      POSTGRES_DB: chatbotdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: bilal@123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: chatbot_backend
+    environment:
+      DATABASE_URL: postgresql://postgres:bilal%40123@postgres:5432/chatbotdb
+      # Add other env vars as needed
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./.env:/app/.env  # Mount .env file if needed
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: chatbot_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
