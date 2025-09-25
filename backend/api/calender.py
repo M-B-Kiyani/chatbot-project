@@ -52,10 +52,11 @@ async def calendar_auth():
 
 @router.get("/calendar/callback")
 async def calendar_callback(code: str = Query(..., description="Authorization code"),
-                           state: str = Query(..., description="State parameter")):
+                            state: str = Query(..., description="State parameter"),
+                            db: Session = Depends(get_db)):
     """Handle OAuth callback."""
     try:
-        success = calendar_service.complete_oauth_flow(code, state)
+        success = calendar_service.complete_oauth_flow(db, code, state)
         if success:
             return {"message": "Authentication successful"}
         else:
@@ -65,18 +66,19 @@ async def calendar_callback(code: str = Query(..., description="Authorization co
 
 @router.get("/calendar/freebusy")
 async def calendar_freebusy(start: str = Query(..., description="Start time in ISO format"),
-                           end: str = Query(..., description="End time in ISO format"),
-                           calendar_id: str = Query("primary", description="Calendar ID"),
-                           timezone: str = Query("UTC", description="Timezone")):
+                            end: str = Query(..., description="End time in ISO format"),
+                            calendar_id: str = Query("primary", description="Calendar ID"),
+                            timezone: str = Query("UTC", description="Timezone"),
+                            db: Session = Depends(get_db)):
     """Get free/busy information."""
     try:
-        result = calendar_service.get_freebusy(start, end, calendar_id, timezone)
+        result = calendar_service.get_freebusy(db, start, end, calendar_id, timezone)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Freebusy query failed: {str(e)}")
 
 @router.post("/calendar/create")
-async def calendar_create_event(event_data: dict):
+async def calendar_create_event(event_data: dict, db: Session = Depends(get_db)):
     """Create a calendar event."""
     try:
         summary = event_data.get("summary")
@@ -90,13 +92,13 @@ async def calendar_create_event(event_data: dict):
         if not summary or not start or not end:
             raise HTTPException(status_code=400, detail="Missing required fields: summary, start, end")
 
-        event_id = calendar_service.create_event(summary, start, end, timezone, description, attendees, calendar_id)
+        event_id = calendar_service.create_event(db, summary, start, end, timezone, description, attendees, calendar_id)
         return {"event_id": event_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Event creation failed: {str(e)}")
 
 @router.post("/schedule-check", response_model=ScheduleCheckResponse)
-async def schedule_check(request: ScheduleCheckRequest):
+async def schedule_check(request: ScheduleCheckRequest, db: Session = Depends(get_db)):
     """
     Check if a booking can be made at the specified time and duration.
 
@@ -109,6 +111,7 @@ async def schedule_check(request: ScheduleCheckRequest):
     try:
         # Check booking rules
         check_result = calendar_service.check_booking_rules(
+            db,
             request.calendar_id,
             request.start,
             request.duration
@@ -118,6 +121,7 @@ async def schedule_check(request: ScheduleCheckRequest):
         suggested_slot = None
         if not check_result["allowed"]:
             suggestion = calendar_service.suggest_next_slot(
+                db,
                 request.calendar_id,
                 request.start,
                 request.duration
@@ -149,6 +153,7 @@ async def create_booking(request: CreateBookingRequest, db: Session = Depends(ge
     try:
         # First check if booking is allowed
         check_result = calendar_service.check_booking_rules(
+            db,
             request.calendar_id,
             request.start,
             request.duration
@@ -168,6 +173,7 @@ async def create_booking(request: CreateBookingRequest, db: Session = Depends(ge
 
         # Create the event
         event_id = calendar_service.create_event(
+            db,
             summary=request.summary,
             start=request.start,
             end=end_iso,
