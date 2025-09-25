@@ -102,5 +102,4 @@ class DocumentChunk(Base):
 Index('document_chunks_embedding_idx', DocumentChunk.embedding, postgresql_using='ivfflat')
 
 # Import GoogleToken to ensure it's registered with Base
-from .models.google_token import GoogleToken
-
+from .google_token import GoogleToken

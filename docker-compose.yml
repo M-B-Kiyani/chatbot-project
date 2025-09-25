@@ -21,8 +21,8 @@ services:
 
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: chatbot_backend
     environment:
       DATABASE_URL: postgresql://postgres:bilal%40123@postgres:5432/chatbotdb
@@ -37,8 +37,8 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: chatbot_frontend
     ports:
       - "3000:80"

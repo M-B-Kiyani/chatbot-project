@@ -1,16 +1,18 @@
 # backend/services/calendar_service.py
 import os
-import pickle
 import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any
 from pathlib import Path
+from sqlalchemy.orm import Session
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+
+from services.google_token_manager import google_token_manager
 
 
 # backend/services/calendar_service.py (pseudocode)
@@ -40,22 +42,35 @@ class CalendarService:
         self.client_id = os.getenv('GOOGLE_CLIENT_ID')
         self.client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
         self.redirect_uri = os.getenv('GOOGLE_REDIRECT_URI', 'http://localhost:8000/api/calendar/callback')
-        self.token_path = Path(__file__).parent.parent / 'token.pickle'
+        self.user_id = os.getenv('GOOGLE_USER_ID', 'default')  # For single user, can be configured
 
-    def get_credentials(self) -> Optional[Credentials]:
+    def get_credentials(self, db: Session) -> Optional[Credentials]:
         """Get valid credentials for Google API."""
-        creds = None
-        # The file token.pickle stores the user's access and refresh tokens
-        if self.token_path.exists():
-            with open(self.token_path, 'rb') as token:
-                creds = pickle.load(token)
+        token_data = google_token_manager.get_token(db, self.user_id)
+        if not token_data:
+            return None
 
-        # If there are no (valid) credentials available, let the user log in.
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
+        creds = Credentials(
+            token=token_data['access_token'],
+            refresh_token=token_data.get('refresh_token'),
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=self.client_id,
+            client_secret=self.client_secret,
+            scopes=SCOPES
+        )
+
+        # If expired and has refresh token, refresh it
+        if creds.expired and creds.refresh_token:
+            try:
                 creds.refresh(Request())
-            else:
-                return None  # Need to initiate OAuth flow
+                # Save the refreshed token
+                google_token_manager.save_token(
+                    db, self.user_id, creds.token, creds.refresh_token,
+                    datetime.utcnow() + timedelta(seconds=creds.expiry.timestamp() - datetime.utcnow().timestamp()) if creds.expiry else None
+                )
+            except Exception as e:
+                print(f"Token refresh failed: {e}")
+                return None
 
         return creds
 
@@ -78,16 +93,17 @@ class CalendarService:
             access_type='offline',
             include_granted_scopes='true'
         )
-        # Store state for verification
-        with open(self.token_path.parent / 'oauth_state.json', 'w') as f:
+        # Store state for verification (using a simple in-memory or file approach for now)
+        # In production, this should be stored securely
+        with open(Path(__file__).parent.parent / 'oauth_state.json', 'w') as f:
             json.dump({'state': state}, f)
         return authorization_url
 
-    def complete_oauth_flow(self, code: str, state: str) -> bool:
+    def complete_oauth_flow(self, db: Session, code: str, state: str) -> bool:
         """Complete OAuth flow with authorization code."""
         try:
             # Verify state
-            state_file = self.token_path.parent / 'oauth_state.json'
+            state_file = Path(__file__).parent.parent / 'oauth_state.json'
             if state_file.exists():
                 with open(state_file, 'r') as f:
                     stored_state = json.load(f).get('state')
@@ -110,9 +126,12 @@ class CalendarService:
             flow.fetch_token(code=code)
 
             creds = flow.credentials
-            # Save the credentials for the next run
-            with open(self.token_path, 'wb') as token:
-                pickle.dump(creds, token)
+            # Save the credentials using the token manager
+            google_token_manager.save_token(
+                db, self.user_id, creds.token, creds.refresh_token,
+                datetime.utcnow() + timedelta(seconds=creds.expiry.timestamp() - datetime.utcnow().timestamp()) if creds.expiry else None,
+                ' '.join(SCOPES)
+            )
 
             # Clean up state file
             if state_file.exists():
@@ -123,9 +142,9 @@ class CalendarService:
             print(f"OAuth completion failed: {e}")
             return False
 
-    def get_freebusy(self, start: str, end: str, calendar_id: str = 'primary', timezone: str = 'UTC') -> Dict[str, Any]:
+    def get_freebusy(self, db: Session, start: str, end: str, calendar_id: str = 'primary', timezone: str = 'UTC') -> Dict[str, Any]:
         """Get free/busy information for a calendar."""
-        creds = self.get_credentials()
+        creds = self.get_credentials(db)
         if not creds:
             raise Exception("No valid credentials. Please authenticate first.")
 
@@ -144,9 +163,9 @@ class CalendarService:
         except HttpError as error:
             raise Exception(f"Freebusy query failed: {error}")
 
-    def get_events(self, calendar_id: str, time_min: str, time_max: str) -> List[Dict[str, Any]]:
+    def get_events(self, db: Session, calendar_id: str, time_min: str, time_max: str) -> List[Dict[str, Any]]:
         """Get calendar events between time_min and time_max."""
-        creds = self.get_credentials()
+        creds = self.get_credentials(db)
         if not creds:
             raise Exception("No valid credentials. Please authenticate first.")
 
@@ -163,7 +182,7 @@ class CalendarService:
         except HttpError as error:
             raise Exception(f"Events query failed: {error}")
 
-    def check_booking_rules(self, calendarId: str, requestedStartISO: str, durationMinutes: int) -> Dict[str, Any]:
+    def check_booking_rules(self, db: Session, calendarId: str, requestedStartISO: str, durationMinutes: int) -> Dict[str, Any]:
         """Check if a booking can be made based on rules."""
         # Determine category and window hours
         if durationMinutes <= 15:
@@ -188,7 +207,7 @@ class CalendarService:
         # Query events in the rolling window
         query_start = window_start.isoformat()
         query_end = window_end.isoformat()
-        events = self.get_events(calendarId, query_start, query_end)
+        events = self.get_events(db, calendarId, query_start, query_end)
 
         # Helper to get category
         def get_category(dur_min: float) -> Optional[int]:
@@ -226,7 +245,7 @@ class CalendarService:
             reason = f"Booking rejected: Maximum of 2 {category}-minute bookings allowed in the last {window_hours} hour(s). Current count: {count}."
         return {"allowed": allowed, "reason": reason, "blockingEvents": blocking_events}
 
-    def suggest_next_slot(self, calendarId: str, requestedStartISO: str, durationMinutes: int, searchHorizonHours: int = 72) -> Dict[str, Any]:
+    def suggest_next_slot(self, db: Session, calendarId: str, requestedStartISO: str, durationMinutes: int, searchHorizonHours: int = 72) -> Dict[str, Any]:
         """Suggest the next valid slot by scanning future slots in 15-minute increments."""
         start_dt = datetime.fromisoformat(requestedStartISO.replace('Z', '+00:00'))
         horizon_end = start_dt + timedelta(hours=searchHorizonHours)
@@ -234,18 +253,18 @@ class CalendarService:
 
         while current < horizon_end:
             slot_iso = current.isoformat().replace('+00:00', '') + 'Z'
-            check = self.check_booking_rules(calendarId, slot_iso, durationMinutes)
+            check = self.check_booking_rules(db, calendarId, slot_iso, durationMinutes)
             if check['allowed']:
                 return {"slot": slot_iso, "reason": check['reason']}
             current += timedelta(minutes=15)
 
         return {"message": f"No available slots found within the next {searchHorizonHours} hours. Please try a different time or contact support for assistance."}
 
-    def create_event(self, summary: str, start: str, end: str, timezone: str = 'UTC',
+    def create_event(self, db: Session, summary: str, start: str, end: str, timezone: str = 'UTC',
                     description: Optional[str] = None, attendees: Optional[List[str]] = None,
                     calendar_id: str = 'primary') -> str:
         """Create a calendar event."""
-        creds = self.get_credentials()
+        creds = self.get_credentials(db)
         if not creds:
             raise Exception("No valid credentials. Please authenticate first.")
 
