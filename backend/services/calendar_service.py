@@ -12,6 +12,26 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+
+# backend/services/calendar_service.py (pseudocode)
+from datetime import datetime, timedelta
+
+def check_booking_limits(existing_events, requested_start, duration_minutes):
+    # existing_events: list of datetimes/durations for the user
+    # enforce:
+    # - max 2 bookings of 15m in rolling 1 hour
+    # - max 2 bookings of 30m in rolling 2 hours
+    # - max 2 bookings of 60m in rolling 3 hours
+    windows = {15: 60, 30: 120, 60: 180}
+    for d, window_minutes in windows.items():
+        if duration_minutes == d:
+            window_start = requested_start - timedelta(minutes=window_minutes)
+            count = sum(1 for ev in existing_events if ev.start >= window_start and ev.duration == d)
+            if count >= 2:
+                return False, f"Limit for {d}-minute bookings reached in the last {window_minutes//60} hours."
+    return True, ""
+
+
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/calendar.events']
 

@@ -14,17 +14,17 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 
-from ..services.rag_service import RAGService
-from ..db.database import get_db
-from ..db.models import Session as SessionModel, Lead
+from services.rag_service import RAGService
+from db.database import get_db
+from db.models import Session as SessionModel, Lead
 import json
 from sqlalchemy.orm import Session as DBSession
 
 # Calendar imports
-from ..services.calendar_service import calendar_service
+from services.calendar_service import calendar_service
 
 # HubSpot imports
-from ..services.hubspot_service import upsert_contact_and_add_note
+from services.hubspot_service import upsert_contact_and_add_note
 
 router = APIRouter()
 
@@ -397,7 +397,7 @@ async def upsert_hubspot(request: SimpleHubSpotUpsertRequest):
     """
     try:
         # Import the service functions
-        from ..services.hubspot_service import search_contact_by_email, create_contact, update_contact
+        from services.hubspot_service import search_contact_by_email, create_contact, update_contact
 
         # Search for existing contact
         contact_id, _ = search_contact_by_email(request.email)

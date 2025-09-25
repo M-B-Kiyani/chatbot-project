@@ -50,27 +50,15 @@ def main():
 # if __name__ == "__main__":
 #     main()
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from .api.routes import router
-from .services.rag_service import RAGService
-from .db.database import create_tables
+from api.routes import router
+from services.rag_service import RAGService
+from db.database import create_tables
 
-app = FastAPI()
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Frontend URLs
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(router, prefix="/api")
-
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """Initialize the RAG system and create database tables on startup."""
     print("Starting system initialization...")
     try:
@@ -86,7 +74,20 @@ async def startup_event():
     except Exception as e:
         print(f"Error initializing system: {e}")
         print("The system will continue but some functionality may not work properly.")
+    yield
 
+app = FastAPI(lifespan=lifespan)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Frontend URLs
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(router, prefix="/api")
 
 @app.get("/health")
 async def health_check():

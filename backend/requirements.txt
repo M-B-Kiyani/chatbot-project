@@ -5,45 +5,46 @@ python-dotenv==1.0.0
 pydantic>=2.7.4,<3.0.0
 pydantic-core>=2.18.0,<3.0.0
 
-
-
 # Database
 sqlalchemy==2.0.23
 alembic==1.13.0
 psycopg2-binary==2.9.10
 pgvector==0.4.1
 
-# Auth
+# Auth / Google APIs
 google-auth==2.23.4
 google-auth-oauthlib==1.1.0
 google-auth-httplib2==0.2.0
 google-api-python-client==2.108.0
 
-# HubSpot 
+# HubSpot
 hubspot-api-client==7.0.0
 
 # OpenAI integration
 openai==1.1.0
 
-# Langchain 
+# LangChain (latest in 0.3.x series; supports Pydantic v2)  
 langchain==0.3.27
 
-# Vector database with pgvector
-pgvector==0.4.1
-tiktoken==0.5.1
-numpy==1.26.4
+# Vector processing, embeddings, etc
+tiktoken>=0.5.1
+
+# Replace NumPy 1.26.4 with 2.x which supports Python 3.13  
+# numpy>=2.1.0
+numpy>=2.1.2
 
 
-# Document processing 
+
+# Document processing
 PyPDF2==3.0.1
 python-docx==1.1.0
-pypdf==6.0.0  # Alternative to PyPDF2, not needed
+pypdf==6.0.0
 
-# HTTP client (required for RAG)
+# HTTP clients / RAG
 httpx==0.27.2
 requests==2.31.0
 
-# Development (optional)
+# Development tools
 pytest==7.4.3
 pytest-asyncio==0.21.1
 black==23.11.0
