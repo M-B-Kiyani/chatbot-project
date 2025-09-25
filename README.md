@@ -86,8 +86,9 @@ Chatbot/
 - Python 3.8+
 - Node.js 16+
 - npm or yarn
-- PostgreSQL (required)
+- PostgreSQL (required for non-Docker setups)
 - [Miniconda or Anaconda](https://docs.conda.io/projects/miniconda/en/latest/) (recommended for environment management)
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) (for containerized deployment)
 
 ### 1. Install Dependencies
 
@@ -124,6 +125,55 @@ pip install -r requirements.txt
 ```bash
 cd frontend
 npm install
+```
+
+#### Option 3: Using Docker (Recommended for Production)
+
+Docker provides complete containerization with all dependencies pre-configured.
+
+1. **Install Docker and Docker Compose** (see Prerequisites)
+
+2. **Clone the repository and navigate to the project directory**
+
+3. **Create environment file**:
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` with your actual API keys and configuration.
+
+4. **Start all services**:
+   ```bash
+   docker-compose up --build
+   ```
+
+5. **Access the application**:
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000
+   - API Documentation: http://localhost:8000/docs
+
+#### Docker Services
+
+- **postgres**: PostgreSQL database with pgvector extension for embeddings
+- **backend**: FastAPI application server
+- **frontend**: React application served by nginx
+
+#### Useful Docker Commands
+
+```bash
+# Start services in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# Rebuild after code changes
+docker-compose up --build
+
+# Run tests in Docker
+docker-compose exec backend pytest tests/ -v
 ```
 
 ### 2. Environment Configuration
@@ -176,6 +226,7 @@ PORT=8000
 
 ### Google OAuth Setup
 
+#### Development Setup
 - [ ] Go to [Google Cloud Console](https://console.cloud.google.com/)
 - [ ] Create/select a project
 - [ ] Enable Google Calendar API
@@ -185,6 +236,11 @@ PORT=8000
   - `GOOGLE_CLIENT_ID`: Your Google OAuth client ID
   - `GOOGLE_CLIENT_SECRET`: Your Google OAuth client secret
   - `GOOGLE_REDIRECT_URI`: `http://localhost:8000/api/calendar/callback`
+
+#### Production Setup
+- [ ] In Google Cloud Console, add additional authorized redirect URI: `https://yourdomain.com/api/calendar/callback`
+- [ ] Update `GOOGLE_REDIRECT_URI` in your production `.env` file to: `https://yourdomain.com/api/calendar/callback`
+- [ ] Ensure your production domain is properly configured for HTTPS
 
 ### 3. Run Development Servers
 
