@@ -5,11 +5,19 @@ Chatbot Backend Main Entry Point
 
 import os
 import sys
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Set up structured logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='{"timestamp": "%(asctime)s", "level": "%(levelname)s", "message": "%(message)s"}',
+    datefmt='%Y-%m-%dT%H:%M:%S%z'
+)
 
 # Add the project root to Python path for imports
 backend_dir = Path(__file__).parent
@@ -53,41 +61,46 @@ def main():
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import router
 
 print("Main module loaded")
+from backend.api.routes import router
 from backend.api.calender import router as calendar_router
 from backend.api.chat import router as chat_router
 from backend.api.hubspot import router as hubspot_router
 from backend.api.intent import router as intent_router
+from backend.api.health import router as health_router
 from services.rag_service import RAGService
 from db.database import create_tables
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize the RAG system and create database tables on startup."""
-    print("Starting system initialization...")
+    logging.info("Starting system initialization")
     try:
         # Create database tables
         create_tables()
-        print("Database tables created successfully!")
+        logging.info("Database tables created successfully")
 
         # Initialize RAG system
         rag_service = RAGService()
         rag_service.process_knowledge_base()
-        print("RAG system initialized successfully!")
+        logging.info("RAG system initialized successfully")
 
     except Exception as e:
-        print(f"Error initializing system: {e}")
-        print("The system will continue but some functionality may not work properly.")
+        logging.error(f"Error initializing system: {e}")
+        logging.warning("The system will continue but some functionality may not work properly.")
     yield
 
 app = FastAPI(lifespan=lifespan)
 
+# Get allowed origins from environment
+allowed_origins = os.getenv('ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:4173,http://127.0.0.1:4173')
+allow_origins_list = [origin.strip() for origin in allowed_origins.split(',') if origin.strip()]
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:4173", "http://127.0.0.1:4173"],  # Frontend URLs
+    allow_origins=allow_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -98,11 +111,7 @@ app.include_router(calendar_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(hubspot_router, prefix="/api")
 app.include_router(intent_router, prefix="/api")
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "service": "rag-backend"}
+app.include_router(health_router, prefix="/api")
 
 @app.get("/")
 async def root():
