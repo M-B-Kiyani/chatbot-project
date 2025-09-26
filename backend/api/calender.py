@@ -4,10 +4,10 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
-from services.calendar_service import calendar_service
-from db.database import get_db
-from db.models import Lead
-from services.hubspot_service import upsert_contact_and_add_note
+from backend.services.calendar_service import calendar_service
+from backend.db.database import get_db
+from backend.db.models import Lead
+from backend.services.hubspot_service import upsert_contact_and_add_note
 
 router = APIRouter()
 

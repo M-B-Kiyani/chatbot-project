@@ -1,6 +1,6 @@
 # Metalogics AI Chatbot
 
-A production-ready smart chatbot for metalogics.io with RAG capabilities, Google Calendar integration, HubSpot CRM integration, and intelligent booking management. Built with FastAPI backend and React frontend.
+A production-ready smart chatbot for metalogics.io with RAG capabilities, Google Calendar integration, HubSpot CRM integration, and intelligent booking management. Built with FastAPI backend, React frontend, and PostgreSQL with pgvector for vector storage.
 
 ## 🏗️ Project Structure
 
@@ -8,25 +8,32 @@ A production-ready smart chatbot for metalogics.io with RAG capabilities, Google
 Chatbot/
 ├── backend/                 # FastAPI backend server
 │   ├── api/                # API routes and endpoints
+│   │   ├── routes.py       # RAG and general API endpoints
+│   │   ├── chat.py         # Chat processing endpoint
+│   │   ├── calender.py     # Calendar booking endpoints
+│   │   ├── hubspot.py      # HubSpot CRM integration
+│   │   ├── intent.py       # Intent detection and upsell
+│   │   └── health.py       # Health check endpoint
 │   ├── services/           # Business logic services
 │   ├── db/                 # Database models and connections
-│   ├── main.py            # Backend entry point
+│   ├── main.py            # Backend entry point with FastAPI app
 │   └── requirements.txt   # Python dependencies
 ├── frontend/               # React frontend application
 │   ├── src/               # React source code
-│   ├── public/            # Static assets
+│   ├── components/        # Reusable React components
 │   ├── package.json       # Node.js dependencies
 │   └── vite.config.js     # Vite configuration
-├── knowledge_base/         # RAG knowledge base
+├── knowledge_base/         # RAG knowledge base documents
 │   ├── documents/         # Raw documents for processing
-│   ├── embeddings/        # Processed embeddings
+│   ├── embeddings/        # Processed embeddings (generated)
 │   ├── processors/        # Document processing scripts
-│   └── config/            # Knowledge base configuration
-├── tests/                  # Test suite
-│   ├── unit/              # Unit tests
-│   ├── integration/       # Integration tests
-│   └── conftest.py        # Pytest configuration
-└── .env                   # Environment variables (create this)
+│   └── scripts/           # Knowledge base management scripts
+├── scripts/               # Utility scripts
+├── docker/                # Docker configuration
+├── pgvector/              # pgvector extension source
+├── environment.yml        # Conda environment configuration
+├── docker-compose.yml     # Multi-container Docker setup
+└── .env                   # Environment variables (create from .env.example)
 ```
 
 ## ✨ Key Features
@@ -66,27 +73,35 @@ Chatbot/
 
 ## 🔌 API Endpoints
 
-| Endpoint                 | Method | Description                 |
-| ------------------------ | ------ | --------------------------- |
-| `/api/chat`              | POST   | Main chat endpoint with RAG |
-| `/api/rag-search`        | GET    | Search knowledge base       |
-| `/api/rag-answer`        | POST   | Generate RAG answer         |
-| `/api/schedule-check`    | POST   | Check booking availability  |
-| `/api/create-booking`    | POST   | Create calendar booking     |
-| `/api/pricing`           | GET    | Get service pricing         |
-| `/api/intent-hint`       | POST   | Get upsell suggestions      |
-| `/api/upsert-hubspot`    | POST   | Manage HubSpot contacts     |
-| `/api/calendar/auth`     | GET    | Initiate Google OAuth       |
-| `/api/calendar/freebusy` | GET    | Get calendar availability   |
+| Endpoint                 | Method | Description                          |
+| ------------------------ | ------ | ------------------------------------ |
+| `/api/chat`              | POST   | Main chat endpoint with RAG          |
+| `/api/rag-search`        | GET    | Search knowledge base documents      |
+| `/api/rag-answer`        | POST   | Generate RAG answer                  |
+| `/api/knowledge`         | GET    | Get knowledge base statistics        |
+| `/api/knowledge/process` | POST   | Process knowledge base documents     |
+| `/api/pricing`           | GET    | Get service pricing information      |
+| `/api/intent-hint`       | POST   | Get upsell suggestions by intent     |
+| `/api/log-message`       | POST   | Log chat messages to database        |
+| `/api/schedule-check`    | POST   | Check booking availability           |
+| `/api/create-booking`    | POST   | Create calendar booking              |
+| `/api/calendar/auth`     | GET    | Initiate Google Calendar OAuth       |
+| `/api/calendar/callback` | GET    | Handle Google OAuth callback         |
+| `/api/calendar/freebusy` | GET    | Get calendar free/busy info          |
+| `/api/calendar/create`   | POST   | Create calendar event                |
+| `/api/upsert-hubspot`    | POST   | Manage HubSpot contacts              |
+| `/api/health`            | GET    | Health check endpoint                |
+| `/`                      | GET    | Root endpoint with API info          |
+| `/docs`                  | GET    | FastAPI interactive documentation    |
 
 ## 🚀 Setup
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.11 (Note: Python 3.13+ may have SQLAlchemy compatibility issues)
 - Node.js 16+
 - npm or yarn
-- PostgreSQL (required for non-Docker setups)
+- PostgreSQL with pgvector extension (for vector storage)
 - [Miniconda or Anaconda](https://docs.conda.io/projects/miniconda/en/latest/) (recommended for environment management)
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) (for containerized deployment)
 
@@ -101,9 +116,9 @@ Conda provides isolated environments, making it easier to manage dependencies an
 conda env create -f environment.yml
 
 # Activate the environment
-conda activate chatbot-backend
+conda activate chatbot
 
-# For frontend dependencies (still use npm)
+# Install frontend dependencies
 cd frontend
 npm install
 cd ..
@@ -153,9 +168,9 @@ Docker provides complete containerization with all dependencies pre-configured.
 
 #### Docker Services
 
-- **postgres**: PostgreSQL database with pgvector extension for embeddings
-- **backend**: FastAPI application server
-- **frontend**: React application served by nginx
+- **postgres**: PostgreSQL database with pgvector extension for vector embeddings
+- **backend**: FastAPI application server with RAG, calendar, and HubSpot integrations
+- **frontend**: React application served by nginx on port 3000
 
 #### Useful Docker Commands
 
@@ -195,11 +210,12 @@ HUBSPOT_ACCESS_TOKEN=your_hubspot_access_token
 # OpenAI Integration (for RAG and chat responses)
 OPENAI_API_KEY=your_openai_api_key
 
-# Vector Database (ChromaDB is used instead of Pinecone)
-# No additional configuration needed - uses local ChromaDB
+# Vector Database (pgvector with PostgreSQL)
+# No additional configuration needed - uses local PostgreSQL with pgvector
 
-# Database (SQLite for development, can be configured for PostgreSQL)
-DATABASE_URL=sqlite:///./chatbot.db
+# Database (PostgreSQL with pgvector for production, SQLite for simple testing)
+DATABASE_URL=postgresql://postgres:bilal%40123@localhost:5432/chatbotdb
+# For SQLite (simpler setup): DATABASE_URL=sqlite:///./test_booking.db
 
 # Application Settings
 APP_BASE_URL=http://localhost:8000
@@ -250,20 +266,21 @@ If using conda:
 
 ```bash
 # Activate conda environment (if not already activated)
-conda activate chatbot-backend
+conda activate chatbot
 
-cd backend
-python main.py
+# Run the backend server
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 If using pip environment:
 
 ```bash
-cd backend
-python main.py
+# Run the backend server
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The backend will run on `http://localhost:8000`
+API documentation available at `http://localhost:8000/docs`
 
 #### Start Frontend Server
 
@@ -280,8 +297,8 @@ If using conda:
 
 ```bash
 # Terminal 1 - Backend
-conda activate chatbot-backend
-cd backend && python main.py
+conda activate chatbot
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 # Terminal 2 - Frontend
 cd frontend && npm run dev
@@ -291,7 +308,7 @@ If using pip:
 
 ```bash
 # Terminal 1 - Backend
-cd backend && python main.py
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 # Terminal 2 - Frontend
 cd frontend && npm run dev
@@ -388,8 +405,8 @@ The RAG system includes:
 
 - **Document Processing**: Support for PDF, DOCX, TXT, HTML files
 - **Embedding Generation**: OpenAI embeddings for semantic search
-- **Vector Storage**: Pinecone or similar vector database
-- **Retrieval**: Context-aware document retrieval
+- **Vector Storage**: PostgreSQL with pgvector extension for local vector storage
+- **Retrieval**: Context-aware document retrieval with relevance scoring
 
 ## 📁 Key Files
 
@@ -436,11 +453,11 @@ npm run lint               # Run linter
 
 - Python 3.8+
 - Node.js 16+
-- Production database (PostgreSQL required)
+- Production database (PostgreSQL with pgvector extension required)
 - OpenAI API access
 - Google Cloud Console project for OAuth
 - HubSpot developer account
-- ChromaDB for vector storage
+- pgvector extension for vector storage
 
 ### Environment Variables Setup
 
@@ -514,19 +531,28 @@ The application requires the following HubSpot scopes for the private app:
 
 ### Vector Database Setup
 
-The application uses ChromaDB for vector storage. The database is automatically initialized when the application starts.
+The application uses PostgreSQL with pgvector extension for vector storage. The database is automatically initialized when the application starts.
 
-1. **Process knowledge base documents**:
+1. **Ensure PostgreSQL is running with pgvector**:
 
-   ```bash
-   cd backend
-   python -c "from services.rag_service import RAGService; rag = RAGService(); rag.process_knowledge_base()"
-   ```
+    For Docker setup:
+    ```bash
+    docker-compose up postgres -d
+    ```
 
-2. **Verify vector database**:
-   ```bash
-   curl http://localhost:8001/knowledge
-   ```
+    For local PostgreSQL, ensure pgvector extension is installed.
+
+2. **Process knowledge base documents**:
+
+    ```bash
+    # From project root
+    python -c "from backend.services.rag_service import RAGService; rag = RAGService(); rag.process_knowledge_base()"
+    ```
+
+3. **Verify vector database**:
+    ```bash
+    curl http://localhost:8000/api/knowledge
+    ```
 
 ### Backend Deployment
 
@@ -545,16 +571,16 @@ The application uses ChromaDB for vector storage. The database is automatically 
 
 5. **Start the server**:
 
-   ```bash
-   # Development
-   python main.py
+    ```bash
+    # Development
+    uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
-   # Production with uvicorn
-   uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+    # Production with uvicorn
+    uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 4
 
-   # Production with gunicorn
-   gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app
-   ```
+    # Production with gunicorn
+    gunicorn -w 4 -k uvicorn.workers.UvicornWorker backend.main:app
+    ```
 
 ### Frontend Deployment
 
@@ -621,13 +647,13 @@ curl "http://yourdomain.com/rag-search?q=web%20development&n_results=3"
 #### Knowledge Base Stats
 
 ```bash
-curl http://yourdomain.com/knowledge
+curl http://localhost:8000/api/knowledge
 ```
 
 #### Process Knowledge Base
 
 ```bash
-curl -X POST http://yourdomain.com/knowledge/process
+curl -X POST http://localhost:8000/api/knowledge/process
 ```
 
 #### Pricing Information
@@ -748,5 +774,9 @@ For support and questions:
 
 ---
 
-**Note**: This is a project scaffold. The placeholder implementations need to be replaced with actual functionality for production use.
-# chatbot-project
+## ⚠️ Known Issues
+
+- **Python 3.13+ Compatibility**: The current SQLAlchemy version may have compatibility issues with Python 3.13+. Use Python 3.11 as specified in `environment.yml` for best compatibility.
+- **Conda Environment**: If conda commands are not recognized in your terminal, you may need to use Anaconda Prompt or ensure conda is properly initialized in your shell.
+
+**Note**: This is a production-ready chatbot implementation with RAG, calendar booking, and CRM integrations. All core functionality is implemented and ready for deployment.

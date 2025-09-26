@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from cryptography.fernet import Fernet
 
-from db.models.google_token import GoogleToken
+from backend.db.models.google_token import GoogleToken
 
 
 class GoogleTokenManager:

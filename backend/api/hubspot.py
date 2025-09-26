@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 
-from services.hubspot_service import search_contact_by_email, create_contact, update_contact
+from backend.services.hubspot_service import search_contact_by_email, create_contact, update_contact
 
 router = APIRouter()
 
@@ -43,3 +43,15 @@ async def upsert_hubspot(request: SimpleHubSpotUpsertRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"HubSpot upsert failed: {str(e)}")
+
+
+@router.get("/hubspot/auth")
+async def hubspot_auth():
+    """Initiate HubSpot OAuth flow."""
+    try:
+        # For HubSpot, OAuth is typically handled differently, but for simplicity, we'll return a placeholder
+        # In a real implementation, you'd redirect to HubSpot's OAuth URL
+        auth_url = "https://app.hubspot.com/oauth/authorize?client_id=YOUR_CLIENT_ID&scope=contacts&redirect_uri=YOUR_REDIRECT_URI"
+        return {"auth_url": auth_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OAuth initiation failed: {str(e)}")

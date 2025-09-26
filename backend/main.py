@@ -69,8 +69,8 @@ from backend.api.chat import router as chat_router
 from backend.api.hubspot import router as hubspot_router
 from backend.api.intent import router as intent_router
 from backend.api.health import router as health_router
-from services.rag_service import RAGService
-from db.database import create_tables
+from backend.services.rag_service import RAGService
+from backend.db.database import create_tables
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
