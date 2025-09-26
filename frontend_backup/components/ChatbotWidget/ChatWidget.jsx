@@ -1,4 +1,4 @@
-// frontend/src/components/ChatbotWidget/ChatbotWidget.jsx
+// chatbot-widget/src/ChatbotWidget.jsx
 import React, { useState, useEffect, useRef } from "react";
 
 /*
@@ -95,8 +95,8 @@ export default function ChatbotWidget({ baseApiUrl = "" }) {
   }
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <div className="bg-white shadow-2xl rounded-2xl overflow-hidden border flex-1 flex flex-col">
+    <div className="fixed right-6 bottom-6 w-80 max-w-full md:w-96 z-50">
+      <div className="bg-white shadow-2xl rounded-2xl overflow-hidden border">
         <div className="px-4 py-3 bg-gradient-to-r from-sky-600 to-indigo-600 text-white flex items-center justify-between">
           <div>
             <div className="font-semibold text-sm">Metalogics Assistant</div>
